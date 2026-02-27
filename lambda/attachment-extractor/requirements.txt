@@ -1,0 +1,3 @@
+mypylogger
+pypdf
+python-docx

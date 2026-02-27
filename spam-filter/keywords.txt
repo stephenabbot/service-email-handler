@@ -1,0 +1,31 @@
+--- BLOCKED_SENDER_DOMAINS ---
+.*\.cn$
+.*\.ru$
+scam\.net
+spam\.com
+temp-?mail.*
+
+--- SUBJECT_PATTERNS ---
+\$\d+[,.]?\d*\s*(million|thousand|k)
+\blottery\b
+\bprince\b
+\bwinner\b
+act\s+now
+claim.*prize
+click.*here.*now
+congratulations.*you
+fwd:\s*$
+limited.*time.*offer
+re:\s*$
+urgent.*wire
+
+--- BODY_PATTERNS ---
+\binheritance\b
+\d+%\s+off
+click\s+here\s+to\s+claim
+confirm.*identity
+suspended.*account
+unsubscribe.*here
+verify.*account.*immediately
+wire\s+transfer
+you\s+have\s+been\s+selected
