@@ -329,8 +329,9 @@ CloudWatch alarm fires for DLQ depth ≥ 1, or you receive an SNS alert about a 
 
 ### Cause
 
-An outbound email send failed after all retries (4 in-Lambda retries × 5 SQS redeliveries
-= up to 20 total attempts). Common causes:
+An outbound email send failed after all retries. The sender Lambdas retry up to 4 times
+internally with exponential backoff; SQS redelivers up to 5 times (`maxReceiveCount=5`)
+before moving the message to the DLQ. Common causes:
 - Sustained `MailFromDomainNotVerifiedException` (custom MAIL FROM MX down)
 - SES throttling beyond retry window
 - Invalid recipient address

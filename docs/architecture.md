@@ -102,13 +102,18 @@ Triggered by the SES inbound rule for `stephen.abbot@denverbytes.com`.
    - **Gate 3** — PCRE2 pattern matching on sender domain, subject, and body (first 10 KB)
 3. **If spam**: archives to `spam/{YYYY-MM-DD}/{messageId}.eml`, logs to `/email-handler/spam`,
    deletes from staging
-4. **If legitimate**:
+4. **If null envelope sender (RFC 5321 bounce/DSN)**: discards immediately — logs
+   `dsn_discarded` with `message_id`, `subject`, and `reply_to`, deletes from staging,
+   returns. DSNs are never forwarded.
+5. **If legitimate**:
    - Extracts display name from the `From` header for LinkedIn senders
    - Builds conversation ID (see Conversation Identity below)
+   - Logs `email_received` with `message_id`, `sender`, `recipient`, `subject`, `reply_to`,
+     `body_preview`, `conversation_id`, `display_name`, `is_dsn`, `is_spam`, `spam_reason`
    - Checks DynamoDB for an existing conversation record — enqueues auto-acknowledgement
      to `ack-queue` on first contact only
    - Enqueues forward to `forward-queue` with `Reply-To: {conversationId}@thread.denverbytes.com`
-     and a metadata footer appended to the body
+     and a metadata footer appended to the body (skipped silently if `conversation_id` is empty)
    - Archives raw `.eml` to `conversations/{conversationId}/{messageId}`
    - Extracts PDF and DOCX attachments from MIME, saves to
      `attachments/{conversationId}/{messageId}/{filename}`

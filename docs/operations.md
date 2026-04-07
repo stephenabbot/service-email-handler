@@ -185,9 +185,9 @@ All 7 log groups have 365-day retention:
 | `inbound-handler-errors` | Lambda Errors | ≥ 1 / 60s | Inbound processing failure |
 | `reply-handler-errors` | Lambda Errors | ≥ 1 / 60s | Reply processing failure |
 | `attachment-extractor-errors` | Lambda Errors | ≥ 1 / 60s | Text extraction failure |
-| `ack-sender-errors` | Lambda Errors | ≥ 1 / 60s | Ack send failure |
-| `forward-sender-errors` | Lambda Errors | ≥ 1 / 60s | Forward send failure |
-| `reply-sender-errors` | Lambda Errors | ≥ 1 / 60s | Reply send failure |
+| `ack-sender-errors` | Lambda Errors | ≥ 1 for 5 consecutive periods | Ack send failure (retries exhausted) |
+| `forward-sender-errors` | Lambda Errors | ≥ 1 for 5 consecutive periods | Forward send failure (retries exhausted) |
+| `reply-sender-errors` | Lambda Errors | ≥ 1 for 5 consecutive periods | Reply send failure (retries exhausted) |
 | `ack-sender-dlq-depth` | SQS ApproximateNumberOfMessagesVisible | ≥ 1 / 60s | Ack permanently failed |
 | `forward-sender-dlq-depth` | SQS ApproximateNumberOfMessagesVisible | ≥ 1 / 60s | Forward permanently failed |
 | `reply-sender-dlq-depth` | SQS ApproximateNumberOfMessagesVisible | ≥ 1 / 60s | Reply permanently failed |
