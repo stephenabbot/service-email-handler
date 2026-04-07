@@ -141,6 +141,10 @@ def enqueue_acknowledgement(sender_email, subject):
 
 
 def enqueue_forward(sender_email, subject, body, conversation_id):
+    if not conversation_id:
+        logger.error("enqueue_forward_skipped", extra={"reason": "empty_conversation_id", "subject": subject})
+        return
+
     reply_to = f"{conversation_id}@thread.{DOMAIN_NAME}"
     footer = f"\n\n--- METADATA ---\nReply-To: {reply_to}\nOriginal Sender: {sender_email}\nConversation ID: {conversation_id}"
 
@@ -324,27 +328,43 @@ def lambda_handler(event, context):
         msg = BytesParser(policy=policy.default).parsebytes(raw_email)
         sender_email = mail['source']
         subject = msg['subject'] or '(no subject)'
+        reply_to_header = msg.get('Reply-To', '')
         body = msg.get_body(preferencelist=('plain',))
         body_text = body.get_content() if body else ''
 
-        is_spam, reason = check_spam(ses_record, mail, subject, body_text, sender_email)
-
-        if is_spam:
-            handle_spam(message_id, raw_email, sender_email, subject, reason)
+        # RFC 5321: null reverse-path indicates a bounce/DSN — discard immediately
+        if not sender_email:
+            logger.info("dsn_discarded", extra={
+                "message_id": message_id,
+                "subject": subject,
+                "reply_to": reply_to_header
+            })
             s3.delete_object(Bucket=BUCKET_NAME, Key=staging_key)
             return
 
+        is_dsn = subject.lower().startswith('delivery status') or 'mailer-daemon' in sender_email.lower()
+        is_spam, spam_reason = check_spam(ses_record, mail, subject, body_text, sender_email)
         display_name = extract_display_name(msg)
         conversation_id = email_to_conversation_id(sender_email, display_name)
 
         logger.info("email_received", extra={
+            "message_id": message_id,
             "sender": sender_email,
             "recipient": mail['destination'][0],
             "subject": subject,
+            "reply_to": reply_to_header,
             "body_preview": body_text[:500],
             "conversation_id": conversation_id,
-            "display_name": display_name
+            "display_name": display_name,
+            "is_dsn": is_dsn,
+            "is_spam": is_spam,
+            "spam_reason": spam_reason,
         })
+
+        if is_spam:
+            handle_spam(message_id, raw_email, sender_email, subject, spam_reason)
+            s3.delete_object(Bucket=BUCKET_NAME, Key=staging_key)
+            return
 
         first_contact = is_first_contact(sender_email)
 

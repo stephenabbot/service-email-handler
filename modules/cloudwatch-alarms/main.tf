@@ -64,13 +64,14 @@ resource "aws_cloudwatch_metric_alarm" "extractor_errors" {
 resource "aws_cloudwatch_metric_alarm" "ack_sender_errors" {
   alarm_name          = "${var.ack_sender_lambda_name}-errors"
   comparison_operator = "GreaterThanOrEqualToThreshold"
-  evaluation_periods  = 1
+  evaluation_periods  = 5
+  datapoints_to_alarm = 5
   metric_name         = "Errors"
   namespace           = "AWS/Lambda"
   period              = 60
   statistic           = "Sum"
   threshold           = 1
-  alarm_description   = "Ack sender Lambda errors"
+  alarm_description   = "Ack sender Lambda errors (5 consecutive periods — retries exhausted)"
   alarm_actions       = [aws_sns_topic.alerts.arn]
 
   dimensions = {
@@ -81,13 +82,14 @@ resource "aws_cloudwatch_metric_alarm" "ack_sender_errors" {
 resource "aws_cloudwatch_metric_alarm" "forward_sender_errors" {
   alarm_name          = "${var.forward_sender_lambda_name}-errors"
   comparison_operator = "GreaterThanOrEqualToThreshold"
-  evaluation_periods  = 1
+  evaluation_periods  = 5
+  datapoints_to_alarm = 5
   metric_name         = "Errors"
   namespace           = "AWS/Lambda"
   period              = 60
   statistic           = "Sum"
   threshold           = 1
-  alarm_description   = "Forward sender Lambda errors"
+  alarm_description   = "Forward sender Lambda errors (5 consecutive periods — retries exhausted)"
   alarm_actions       = [aws_sns_topic.alerts.arn]
 
   dimensions = {
@@ -98,13 +100,14 @@ resource "aws_cloudwatch_metric_alarm" "forward_sender_errors" {
 resource "aws_cloudwatch_metric_alarm" "reply_sender_errors" {
   alarm_name          = "${var.reply_sender_lambda_name}-errors"
   comparison_operator = "GreaterThanOrEqualToThreshold"
-  evaluation_periods  = 1
+  evaluation_periods  = 5
+  datapoints_to_alarm = 5
   metric_name         = "Errors"
   namespace           = "AWS/Lambda"
   period              = 60
   statistic           = "Sum"
   threshold           = 1
-  alarm_description   = "Reply sender Lambda errors"
+  alarm_description   = "Reply sender Lambda errors (5 consecutive periods — retries exhausted)"
   alarm_actions       = [aws_sns_topic.alerts.arn]
 
   dimensions = {
