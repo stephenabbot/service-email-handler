@@ -163,4 +163,4 @@ alarm notifications.
 
 ---
 
-© Stephen Abbot
+© 2025 Stephen Abbot - MIT License
