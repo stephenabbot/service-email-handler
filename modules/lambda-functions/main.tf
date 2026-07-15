@@ -438,6 +438,11 @@ resource "aws_iam_role_policy" "forward_sender" {
         Effect   = "Allow"
         Action   = "sns:Publish"
         Resource = var.sns_topic_arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = "s3:GetObject"
+        Resource = "arn:aws:s3:::${var.bucket_name}/attachments/*"
       }
     ]
   })
@@ -458,6 +463,7 @@ resource "aws_lambda_function" "forward_sender" {
     variables = {
       PUBLIC_EMAIL  = var.public_email
       SNS_TOPIC_ARN = var.sns_topic_arn
+      BUCKET_NAME   = var.bucket_name
     }
   }
 }
@@ -507,6 +513,11 @@ resource "aws_iam_role_policy" "reply_sender" {
         Effect   = "Allow"
         Action   = "sns:Publish"
         Resource = var.sns_topic_arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = "s3:GetObject"
+        Resource = "arn:aws:s3:::${var.bucket_name}/reply-attachments/*"
       }
     ]
   })
@@ -527,6 +538,7 @@ resource "aws_lambda_function" "reply_sender" {
     variables = {
       PUBLIC_EMAIL  = var.public_email
       SNS_TOPIC_ARN = var.sns_topic_arn
+      BUCKET_NAME   = var.bucket_name
     }
   }
 }

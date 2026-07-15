@@ -140,13 +140,17 @@ def enqueue_acknowledgement(sender_email, subject):
         )
 
 
-def enqueue_forward(sender_email, subject, body, conversation_id):
+def enqueue_forward(sender_email, subject, body, conversation_id, attachment_keys=None, skipped_filenames=None):
     if not conversation_id:
         logger.error("enqueue_forward_skipped", extra={"reason": "empty_conversation_id", "subject": subject})
         return
 
     reply_to = f"{conversation_id}@thread.{DOMAIN_NAME}"
     footer = f"\n\n--- METADATA ---\nReply-To: {reply_to}\nOriginal Sender: {sender_email}\nConversation ID: {conversation_id}"
+
+    if skipped_filenames:
+        for name in skipped_filenames:
+            footer += f"\n[Attachment not forwarded: {name}]"
 
     try:
         sqs.send_message(
@@ -155,7 +159,8 @@ def enqueue_forward(sender_email, subject, body, conversation_id):
                 'recipient': PRIVATE_EMAIL,
                 'subject': f"Fwd: {subject}",
                 'body': body + footer,
-                'reply_to': reply_to
+                'reply_to': reply_to,
+                'attachment_keys': attachment_keys or []
             })
         )
         logger.info("forward_enqueued", extra={
@@ -212,21 +217,33 @@ def store_conversation(conversation_id, sender_email, subject, body_text, displa
             Message=f"Failed to store conversation {conversation_id}: {str(e)}"
         )
 
+FORWARDED_EXTENSIONS = {'.pdf', '.docx', '.ics', '.xlsx', '.png', '.jpg', '.jpeg'}
+
 def save_attachments(msg, conversation_id, message_id):
+    saved_keys = []
+    skipped_filenames = []
+
     for part in msg.iter_attachments():
         filename = part.get_filename()
         if not filename:
             continue
         lower = filename.lower()
-        if lower.endswith('.pdf') or lower.endswith('.docx'):
+        ext = next((e for e in FORWARDED_EXTENSIONS if lower.endswith(e)), None)
+        if ext:
             data = part.get_payload(decode=True)
             if data:
                 key = f"attachments/{conversation_id}/{message_id}/{filename}"
                 try:
                     s3.put_object(Bucket=BUCKET_NAME, Key=key, Body=data)
                     logger.info("attachment_saved", extra={"key": key})
+                    saved_keys.append(key)
                 except Exception as e:
                     logger.error("attachment_save_failed", extra={"error": str(e), "filename": filename})
+        else:
+            skipped_filenames.append(filename)
+            logger.info("attachment_skipped", extra={"filename": filename, "conversation_id": conversation_id})
+
+    return saved_keys, skipped_filenames
 
 def check_spam(ses_record, mail, subject, body, sender_email):
     spam_verdict = ses_record['receipt'].get('spamVerdict', {}).get('status')
@@ -371,13 +388,13 @@ def lambda_handler(event, context):
         if first_contact:
             enqueue_acknowledgement(sender_email, subject)
 
-        enqueue_forward(sender_email, subject, body_text, conversation_id)
-        store_conversation(conversation_id, sender_email, subject, body_text, display_name)
-
-        # Archive raw email and extract PDF/DOCX attachments
+        # Archive raw email and extract/save attachments before forwarding
         conversations_key = f"conversations/{conversation_id}/{message_id}"
         s3.put_object(Bucket=BUCKET_NAME, Key=conversations_key, Body=raw_email)
-        save_attachments(msg, conversation_id, message_id)
+        attachment_keys, skipped_filenames = save_attachments(msg, conversation_id, message_id)
+
+        enqueue_forward(sender_email, subject, body_text, conversation_id, attachment_keys, skipped_filenames)
+        store_conversation(conversation_id, sender_email, subject, body_text, display_name)
 
         s3.delete_object(Bucket=BUCKET_NAME, Key=staging_key)
 

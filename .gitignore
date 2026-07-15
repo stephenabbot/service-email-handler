@@ -33,3 +33,7 @@ Thumbs.db
 
 # Local config
 config.env.local
+
+# Local scratch scripts
+z_commands.sh
+z_results.txt

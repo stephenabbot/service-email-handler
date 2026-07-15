@@ -142,11 +142,27 @@ def lambda_handler(event, context):
         body = msg.get_body(preferencelist=('plain',))
         body_text = body.get_content() if body else ''
 
+        attachment_keys = []
+        for part in msg.iter_attachments():
+            filename = part.get_filename()
+            if not filename:
+                continue
+            data = part.get_payload(decode=True)
+            if data:
+                key = f"reply-attachments/{conversation_id}/{message_id}/{filename}"
+                try:
+                    s3.put_object(Bucket=BUCKET_NAME, Key=key, Body=data)
+                    attachment_keys.append(key)
+                    logger.info("reply_attachment_saved", extra={"key": key})
+                except Exception as e:
+                    logger.error("reply_attachment_save_failed", extra={"error": str(e), "filename": filename})
+
         logger.info("reply_received", extra={
             "conversation_id": conversation_id,
             "recipient": original_sender,
             "subject": subject,
-            "body_preview": body_text[:500]
+            "body_preview": body_text[:500],
+            "attachment_count": len(attachment_keys)
         })
 
         metadata = extract_metadata_commands(body_text)
@@ -159,7 +175,8 @@ def lambda_handler(event, context):
             MessageBody=json.dumps({
                 'recipient': original_sender,
                 'subject': subject,
-                'body': clean_body
+                'body': clean_body,
+                'attachment_keys': attachment_keys
             })
         )
 
