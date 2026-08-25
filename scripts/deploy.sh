@@ -104,14 +104,16 @@ for lambda_dir in lambda/*/; do
     # Create deployment package
     mkdir -p package
     
-    # Install dependencies using podman
+    # Install dependencies using podman.
+    # pip, not uv: on an arm64 host the linux/amd64 builder runs under qemu, where the
+    # uv binary segfaults (qemu: uncaught target signal 11). pip is pure Python and works.
     if [ -f requirements.txt ]; then
         podman run --rm \
             --platform linux/amd64 \
             -v "$(pwd)":/workspace \
             -w /workspace \
             python:3.12-slim \
-            bash -c "pip install uv && uv pip install --system -r requirements.txt --target package/ && cp handler.py package/"
+            bash -c "pip install --no-cache-dir -r requirements.txt --target package/ && cp handler.py package/"
     else
         cp handler.py package/
     fi
