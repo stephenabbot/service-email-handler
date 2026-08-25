@@ -6,6 +6,7 @@ import time
 import boto3
 import pcre2
 from email import policy
+from html import unescape
 from email.parser import BytesParser
 from email.utils import parseaddr
 from datetime import datetime
@@ -245,6 +246,52 @@ def save_attachments(msg, conversation_id, message_id):
 
     return saved_keys, skipped_filenames
 
+# SQS caps a message at 256 KB; leave headroom for the metadata footer and JSON envelope.
+MAX_BODY_CHARS = 100000
+
+
+def render_link(match):
+    # Angle brackets would be eaten by the tag strip below, so links render as "label (url)".
+    url = match.group(1)
+    label = re.sub(r'(?s)<[^>]+>', '', match.group(2)).strip()
+    if not label or label == url:
+        return url
+    return f'{label} ({url})'
+
+
+def html_to_text(markup):
+    # Minimal HTML rendering — the Lambda package carries no HTML parser, and senders
+    # that ship a text/html part with no text/plain alternative are common (gov, LinkedIn).
+    text = markup.replace('\r\n', '\n').replace('\r', '\n')
+    text = re.sub(r'(?is)<(script|style)\b.*?</\1>', '', text)
+    # Link targets are load-bearing (application links, invitations) — keep the URL inline.
+    text = re.sub(r'(?is)<a\b[^>]*?href=["\']([^"\']+)["\'][^>]*>(.*?)</a>', render_link, text)
+    text = re.sub(r'(?is)<br\s*/?>', '\n', text)
+    text = re.sub(r'(?is)<li\b[^>]*>', '\n- ', text)
+    text = re.sub(r'(?is)</(p|div|tr|li|h[1-6]|table|blockquote)>', '\n', text)
+    text = re.sub(r'(?s)<[^>]+>', '', text)
+    text = unescape(text)
+    text = re.sub(r'[ \t\xa0]+', ' ', text)
+    text = re.sub(r' *\n[ \t]*', '\n', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
+
+def extract_body_text(msg):
+    part = msg.get_body(preferencelist=('plain', 'html'))
+    if part is None:
+        return ''
+
+    content = part.get_content()
+    if part.get_content_type() == 'text/html':
+        content = html_to_text(content)
+
+    if len(content) > MAX_BODY_CHARS:
+        content = content[:MAX_BODY_CHARS] + '\n\n[Body truncated — full message archived in S3]'
+
+    return content
+
+
 def check_spam(ses_record, mail, subject, body, sender_email):
     spam_verdict = ses_record['receipt'].get('spamVerdict', {}).get('status')
     virus_verdict = ses_record['receipt'].get('virusVerdict', {}).get('status')
@@ -346,8 +393,7 @@ def lambda_handler(event, context):
         sender_email = mail['source']
         subject = msg['subject'] or '(no subject)'
         reply_to_header = msg.get('Reply-To', '')
-        body = msg.get_body(preferencelist=('plain',))
-        body_text = body.get_content() if body else ''
+        body_text = extract_body_text(msg)
 
         # RFC 5321: null reverse-path indicates a bounce/DSN — discard immediately
         if not sender_email:

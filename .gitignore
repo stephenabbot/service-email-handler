@@ -18,6 +18,7 @@ __pycache__/
 .Python
 env/
 venv/
+.venv/
 ENV/
 
 # IDE
@@ -36,4 +37,8 @@ config.env.local
 
 # Local scratch scripts
 z_commands.sh
+z_commands.sh.tmp
 z_results.txt
+
+# Local planning docs — never commit (this is a public portfolio repo)
+*.local.md
